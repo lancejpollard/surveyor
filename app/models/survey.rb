@@ -10,6 +10,7 @@ class Survey < ActiveRecord::Base
   
   # Validations
   validates_presence_of :title
+#  validates_uniqueness_of :access_code
   
   # Class methods
   def self.to_normalized_string(value)
@@ -21,6 +22,16 @@ class Survey < ActiveRecord::Base
   def initialize(*args)
     super(*args)
     default_args
+  end
+  
+  # All the questions for a given survey
+  def questions
+    sections.map(&:questions).flatten
+  end
+  
+  # All the possible answers for a given survey
+  def answers
+    questions.map(&:answers).flatten
   end
   
   def default_args
@@ -35,19 +46,24 @@ class Survey < ActiveRecord::Base
   def active?
     self.active_as_of?(DateTime.now)
   end
+  
   def active_as_of?(datetime)
     (self.active_at.nil? or self.active_at < datetime) and (self.inactive_at.nil? or self.inactive_at > datetime)
-  end  
+  end
+  
   def activate!
     self.active_at = DateTime.now
   end
+  
   def deactivate!
     self.inactive_at = DateTime.now
   end
+  
   def active_at=(datetime)
     self.inactive_at = nil if !datetime.nil? and !self.inactive_at.nil? and self.inactive_at < datetime
     super(datetime)
   end
+  
   def inactive_at=(datetime)
     self.active_at = nil if !datetime.nil? and !self.active_at.nil? and self.active_at > datetime
     super(datetime)

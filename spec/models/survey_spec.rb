@@ -34,6 +34,10 @@ describe Survey, "that has sections" do
     @survey.sections_with_questions.map(&:questions).flatten.should have(4).questions
     @survey.sections_with_questions.map(&:questions).flatten.should == [@q4,@q1,@q3,@q2]
   end
+  
+  it "should return all questions for a survey" do
+    @survey.questions.length.should == 4
+  end
 
 end
 
