@@ -1,7 +1,7 @@
 # The Surveyor controller a user taking a survey. It is semi-RESTful since it does not have a concrete representation model.
 # The "resource" is a survey attempt/session populating a response set.
 
-class SurveyorController < ApplicationController
+class SurveyorController < Spree::BaseController
   
   # Layout
   layout Surveyor::Config['default.layout'] || 'surveyor_default'
@@ -17,16 +17,18 @@ class SurveyorController < ApplicationController
   end
   
   # Get the response set or current_user
-  # before_filter :get_response_set, :except => [:new, :create]
-  before_filter :get_current_user, :only => [:new, :create]
+  before_filter :get_current_user
+  before_filter :create_response_set, :only => [:show, :create]
+  before_filter :get_response_set, :only => [:edit, :update]
   
   # Actions
   def new
     @surveys = Survey.find(:all)
     redirect_to surveyor_default(:index) unless available_surveys_path == surveyor_default(:index)
   end
+  
   def create
-    if (@survey = Survey.find_by_access_code(params[:survey_code])) && (@response_set = ResponseSet.create(:survey => @survey, :user_id => (@current_user.nil? ? @current_user : @current_user.id)))
+    if @survey and @response_set
       flash[:notice] = "Survey was successfully started."
       redirect_to(edit_my_survey_path(:survey_code => @survey.access_code, :response_set_code  => @response_set.access_code))
     else
@@ -34,11 +36,19 @@ class SurveyorController < ApplicationController
       redirect_to(available_surveys_path)
     end
   end
+  
   def show
+    if @survey and @response_set
+      flash[:notice] = "Survey was successfully started."
+      redirect_to(edit_my_survey_path(:survey_code => @survey.access_code, :response_set_code  => @response_set.access_code))
+    else
+      flash[:notice] = "Unable to find that survey"
+      redirect_to(available_surveys_path)
+    end
   end
+  
   def edit
-    if @response_set = ResponseSet.find_by_access_code(params[:response_set_code], :include => {:responses => [:question, :answer]})
-      @survey = Survey.with_sections.find_by_id(@response_set.survey_id)
+    if @survey and @response_set
       @sections = @survey.sections
       @section = params[:section] ? @sections.with_includes.find(section_id_from(params[:section])) || @sections.with_includes.first : @sections.with_includes.first
       @questions = @section.questions
@@ -48,8 +58,9 @@ class SurveyorController < ApplicationController
       redirect_to(available_surveys_path)
     end
   end
+  
   def update
-    if @response_set = ResponseSet.find_by_access_code(params[:response_set_code], :include => {:responses => :answer})
+    if @response_set
       @response_set.current_section_id = params[:current_section_id]
     else
       flash[:notice] = "Unable to find your responses to the survey"
@@ -88,17 +99,35 @@ class SurveyorController < ApplicationController
     @current_user = self.respond_to?(:current_user) ? self.current_user : nil
   end
   
+  def create_response_set
+    @survey = Survey.find_by_access_code(params[:survey_code])
+    user_id = @current_user.nil? ? nil : @current_user.id
+    @response_set = ResponseSet.find_by_access_code(params[:response_set_code], :include => {:responses => [:question, :answer]}) || ResponseSet.create(:survey => @survey, :user_id => user_id)
+  end
+  
+  def get_response_set
+    @response_set = ResponseSet.find_by_access_code(params[:response_set_code], :include => {:responses => [:question, :answer]}) || ResponseSet.create(:survey => @survey, :user_id => user_id)
+    @survey = Survey.with_sections.find_by_id(@response_set.survey_id) if @response_set
+    user_id = @current_user.nil? ? nil : @current_user.id
+  end
+  
   # Params: the name of some submit buttons store the section we'd like to go to. for repeater questions, an anchor to the repeater group is also stored
   # e.g. params[:section] = {"1"=>{"question_group_1"=>"<= add row"}}
   def section_id_from(p)
     p.respond_to?(:keys) ? p.keys.first : p
   end
+  
   def anchor_from(p)
     p.respond_to?(:keys) && p[p.keys.first].respond_to?(:keys) ? p[p.keys.first].keys.first : nil
   end
   
   # Extending surveyor
   def surveyor_default(type = :finish)
+    session.has_key?(:return_to) and !session[:return_to].blank?
+      url = session[:return_to]
+      session.delete(:return_to)
+      redirect_to url
+    end
     # http://www.postal-code.com/mrhappy/blog/2007/02/01/ruby-comparing-an-objects-class-in-a-case-statement/
     # http://www.skorks.com/2009/08/how-a-ruby-case-statement-works-and-what-you-can-do-with-it/
     case arg = Surveyor::Config["default.#{type.to_s}"]

@@ -3,6 +3,7 @@ class Question < ActiveRecord::Base
   # Associations
   belongs_to :survey_section
   belongs_to :question_group
+  belongs_to :correct_answer, :class_name => "Answer"
   has_many :answers, :order => "display_order ASC" # it might not always have answers
   has_one :dependency
 
@@ -32,9 +33,11 @@ class Question < ActiveRecord::Base
   def dependent?
     self.dependency != nil
   end
+  
   def triggered?(response_set)
     dependent? ? self.dependency.is_met?(response_set) : true
   end
+  
   def css_class(response_set)
     [(dependent? ? "dependent" : nil), (triggered?(response_set) ? nil : "hidden"), custom_class].compact.join(" ")
   end

@@ -25,12 +25,24 @@ class Response < ActiveRecord::Base
     question.correct_answer_id.nil? or self.answer.response_class != "answer" or (question.correct_answer_id.to_i == answer_id.to_i)
   end
   
-  def to_s # used in dependency_explanation_helper
+  def to_q_and_a
+    return {:question => question_text, :answer => answer_text}
+  end
+  
+  def question_text
+    self.question.text
+  end
+  
+  def answer_text
     if self.answer.response_class == "answer" and self.answer_id
       return self.answer.text
     else
-      return "#{(self.string_value || self.text_value || self.integer_value || self.float_value || nil).to_s}"
+      return "#{(self.string_value || self.text_value || self.integer_value || self.float_value || self.datetime_value || nil).to_s}"
     end
+  end
+  
+  def to_s # used in dependency_explanation_helper
+    answer_text
   end
   
 end

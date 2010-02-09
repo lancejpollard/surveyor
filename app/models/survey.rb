@@ -1,9 +1,16 @@
 class Survey < ActiveRecord::Base
   
+  # file describing the survey
+  acts_as_exportable_survey
+  
   # Associations
   has_many :sections, :class_name => "SurveySection", :order => 'display_order'
   has_many :sections_with_questions, :include => :questions, :class_name => "SurveySection", :order => 'display_order'
   has_many :response_sets
+  # so you can associate surveys with models
+  has_many :model_surveys
+  
+  before_save :update_survey_descriptor
   
   # Scopes
   named_scope :with_sections, {:include => :sections}
@@ -22,6 +29,12 @@ class Survey < ActiveRecord::Base
   def initialize(*args)
     super(*args)
     default_args
+  end
+  
+  def update_survey_descriptor
+    return unless @survey_descriptor
+    
+    FileUtils.mkdir("surveys") unless File.exists?("surveys")
   end
   
   # All the questions for a given survey
